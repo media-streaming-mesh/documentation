@@ -31,7 +31,7 @@ Service meshes bring many benefits to web applications such as:
 Our goal is to extend all these to real-time media streaming applications, whilst also enabling additional capabilities such as:
 
 * data protection using [Forward Error Correction](https://en.wikipedia.org/wiki/Error_correction_code#Forward_error_correction), sending data over multiple paths, and/or [NAK](https://en.wikipedia.org/wiki/Acknowledgement_(data_networks))-based mechanisms
-* Stream fan-out to multiple clients by replication and/or unicast to multicast conversion.
+* stream fan-out to multiple clients by replication and/or unicast to multicast conversion.
 
   
 ## Enable intra-cluster, inter-cluster & “extra-cluster” (Internet) apps
@@ -55,20 +55,20 @@ The implementation consists of:
 
 * An RTSP control plane that runs as a per-cluster kubernetes service - written in Golang, and leveraging the [https://github.com/aler9/gortsplib]() library.
 * An RTP/RTCP data plane that runs as a per-node daemon-set - our prototype implementation is written in Golang, but our next step will be to re-implement it in asynchronous Rust using Tokio/Tonic/etc.
-* An stub sidecar which sends control plane traffic to the per-cluster control plane over gRPC, and which is also able to convert interleaved RTP data over RTSP data to native RTP over UDP.  Written in asynchronous Rust using Tokio/Tonic/etc.
+* An stub sidecar which sends control plane traffic to the per-cluster control plane over gRPC, and which is also able to convert interleaved RTP data over RTSP to native RTP over UDP.  Written in asynchronous Rust using Tokio/Tonic/etc.
 * A micro-CNI and mutating webhook as noted above.
 
 Longer term our expectation is that we'll implement [SPIFFE](https://spiffe.io/docs/latest/spiffe-about/overview/)/[SPIRE](https://spiffe.io/docs/latest/spire-about/spire-concepts/) for pod to pod authentication, [OPA](https://www.openpolicyagent.org) for workload authentication and [RTP over QUIC](https://www.ietf.org/archive/id/draft-ietf-avtcore-rtp-over-quic-01.html) for node to node encryption.
 
 We intend to split the control plane into a "controller" that takes care of mapping streams onto the cluster, and a "control plane" entity into which we can plug RTSP and other protocols (such as [SIP](https://en.wikipedia.org/wiki/Session_Initiation_Protocol), [RIST](https://en.wikipedia.org/wiki/Reliable_Internet_Stream_Transport), [WebRTC](https://en.wikipedia.org/wiki/WebRTC), [AMWA NMOS](https://www.amwa.tv/nmos-overview) etc.)
 
-We also intend to make the data-plane pluggable.  The most likely architecture is a configurable chain of WASM filters with a simple filter interface consisting of input and output packet vectors.  This will enable easy contribution of enhanced features such as [FEC](https://en.wikipedia.org/wiki/Error_correction_code), NAK-based error correction, sRTP encryption, congestion control etc.
+We also intend to make the data-plane pluggable.  The most likely architecture is a configurable chain of WASM filters with a simple filter interface consisting of input and output packet vectors.  This will enable easy contribution of enhanced features such as FEC, NAK-based error correction, sRTP encryption, congestion control etc.
 
 To improve performance the data-plane proxy will be enhanced to use DPDK for network I/O, and the stub will use eBPF to intercept data plane traffic from the app at the TCP/UDP socket layer and forward it to the RTP proxy using AF_XDP at the proxy.
 
 In order to keep footprint light one key will be to deploy only the required components for the service being implemented.  So for example we only deploy a single control plane instance per cluster and a single RTP proxy per node.   Remote edge nodes can be deployed without a local control plane - instead relying on a cloud-located control plane instance.
 
-The RTP proxy is deployed with a co-located stub sidecar that acts as an ingress for control plane traffic to enable north/south flows.   The same stub sidecar is also co-located with media pods to proxy east/west control plane traffic, and also (as noted above) may be used to interwork between RTSP over TCP and RTSP using the RTP over UDP dataplane.   Similar interworking functions will be required for RIST.
+The RTP proxy is deployed with a co-located stub sidecar that acts as an ingress for control plane traffic to enable north/south flows.   The same stub sidecar is also co-located with media pods to proxy east/west control plane traffic, and also (as noted above) may be used to interwork between interleaved RTP data over RTSP to native RTP over UDP.   Similar interworking functions will be required for RIST.
 
 # How Can I Get Involved?
 
