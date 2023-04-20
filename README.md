@@ -47,29 +47,28 @@ Equally for broadcast media applications there might be multiple camera feeds in
 
 # How Does It Work?
 
-Our original demo implementation relied on a simple Go-based proxy that runs as a pod sidecar (plus a micro-CNI that creates IPtables rules to direct traffic into the sidecar, and a mutating webhook that injects the sidecar proxy into labelled pods).
+Our original demo implementation relied on a simple Go-based proxy that ran as a pod sidecar (plus a micro-CNI that creates IPtables rules to direct traffic into the sidecar, and a mutating webhook that injects the sidecar proxy into labelled pods).
 
 We have now started implementing our longer-term architecture, and will iteratively enhance this implementation.
 
 The implementation consists of:
 
 * An RTSP control plane that runs as a per-cluster kubernetes service - written in Golang, and leveraging the [https://github.com/aler9/gortsplib]() library.
-* An RTP/RTCP data plane that runs as a per-node daemon-set - written in Golang but being re-implemented in asynchronous Rust using Tokio/Tonic/etc.
-* An RTSP stub that runs as a small sidecar and which sends control plane traffic to the per-cluster control plane, and interleaved RTSP data to the per-node daemonset (converting TCP to UDP as it does so).  Written in asynchronous Rust using Tokio/Tonic/etc.
+* An RTP/RTCP data plane that runs as a per-node daemon-set - our prototype implementation is written in Golang, but our next step will be to re-implement it in asynchronous Rust using Tokio/Tonic/etc.
+* An stub sidecar which sends control plane traffic to the per-cluster control plane over gRPC, and which is also able to convert interleaved RTP data over RTSP data to native RTP over UDP.  Written in asynchronous Rust using Tokio/Tonic/etc.
+* A micro-CNI and mutating webhook as noted above.
 
-Longer term our expectation is that we'll implement [SPIFFE](https://spiffe.io/docs/latest/spiffe-about/overview/)/[SPIRE](https://spiffe.io/docs/latest/spire-about/spire-concepts/) for pod to pod authentication.
+Longer term our expectation is that we'll implement [SPIFFE](https://spiffe.io/docs/latest/spiffe-about/overview/)/[SPIRE](https://spiffe.io/docs/latest/spire-about/spire-concepts/) for pod to pod authentication, [OPA](https://www.openpolicyagent.org) for workload authentication and [RTP over QUIC](https://www.ietf.org/archive/id/draft-ietf-avtcore-rtp-over-quic-01.html) for node to node encryption.
 
-We intend to split the control plane into a "controller" that takes care of mapping streams onto the cluster (and which is programmed using xDS), and a "control plane" entity into which we can plug RTSP and other protocols (such as [SIP](https://en.wikipedia.org/wiki/Session_Initiation_Protocol), [RIST](https://en.wikipedia.org/wiki/Reliable_Internet_Stream_Transport), [WebRTC](https://en.wikipedia.org/wiki/WebRTC), [AMWA NMOS](https://www.amwa.tv/nmos-overview) etc.)
+We intend to split the control plane into a "controller" that takes care of mapping streams onto the cluster, and a "control plane" entity into which we can plug RTSP and other protocols (such as [SIP](https://en.wikipedia.org/wiki/Session_Initiation_Protocol), [RIST](https://en.wikipedia.org/wiki/Reliable_Internet_Stream_Transport), [WebRTC](https://en.wikipedia.org/wiki/WebRTC), [AMWA NMOS](https://www.amwa.tv/nmos-overview) etc.)
 
-We also intend to make the data-plane pluggable.  The most likely architecture is a configurable chain of WASM filters with a simple filter interface consisting of input and output packet vectors.
+We also intend to make the data-plane pluggable.  The most likely architecture is a configurable chain of WASM filters with a simple filter interface consisting of input and output packet vectors.  This will enable easy contribution of enhanced features such as [FEC](https://en.wikipedia.org/wiki/Error_correction_code), NAK-based error correction, sRTP encryption, congestion control etc.
 
 To improve performance the data-plane proxy will be enhanced to use DPDK for network I/O, and the stub will use eBPF to intercept data plane traffic from the app at the TCP/UDP socket layer and forward it to the RTP proxy using AF_XDP at the proxy.
 
-For protocols such as WebRTC and NMOS that use a web-based control plane we intend to implement a version of the MSM stub as an [Envoy](https://www.envoyproxy.io) filter using [WASM](https://webassembly.org).[]()
+In order to keep footprint light one key will be to deploy only the required components for the service being implemented.  So for example we only deploy a single control plane instance per cluster and a single RTP proxy per node.   Remote edge nodes can be deployed without a local control plane - instead relying on a cloud-located control plane instance.
 
-In order to keep footprint light one key will be to deploy only the required components for the service being implemented.
-
-The RTP proxy is deployed with a co-located stub sidecar that can proxy control plane traffic to enable north/south flows.
+The RTP proxy is deployed with a co-located stub sidecar that acts as an ingress for control plane traffic to enable north/south flows.   The same stub sidecar is also co-located with media pods to proxy east/west control plane traffic, and also (as noted above) may be used to interwork between RTSP over TCP and RTSP using the RTP over UDP dataplane.   Similar interworking functions will be required for RIST.
 
 # How Can I Get Involved?
 
