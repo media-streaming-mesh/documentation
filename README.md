@@ -1,3 +1,6 @@
+<p align="center">
+    <img width="400" src="https://user-images.githubusercontent.com/19930603/206326553-75f58ef3-13e4-4f45-9955-72f0b60a941b.svg" alt="MSM logo">
+</p>
 
 # What Is Media Streaming Mesh?
 Media Streaming Mesh is a new concept for supporting RTP-based real-time media applications in Kubernetes.
